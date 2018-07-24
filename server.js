@@ -8,7 +8,6 @@ app.use(bodyParser.json());
 // init sqlite db
 var fs = require('fs');
 var dbFile = '.data/quick-fixins.db';
-fs.unlinkSync(dbFile); // REMOVE IF YOU DON'T WANT TO DELETE
 var exists = fs.existsSync(dbFile);
 var sqlite3 = require('sqlite3').verbose();
 var db = new sqlite3.Database(dbFile);
@@ -88,25 +87,45 @@ app.get('/', function(request, response) {
     response.redirect('https://github.com/JohnBrockway/quick-fixins-backend');
 });
 
+// Endpoint for a status check of the server and db
+app.get('/v1/up', function(request, response) {
+    if (fs.existsSync(dbFile)) {
+        response.sendStatus(200);
+    }
+    else {
+        response.status(500).send("Database not found");
+    }
+});
+
 // endpoint to get every recipe in the database
 app.get('/v1/getRecipes', function(request, response) {
     db.all('SELECT * from Recipes', function(err, rows) {
-        for (var i = 0 ; i < rows.length ; i++) {
-            rows[i].Ingredients = JSON.parse(rows[i].Ingredients);
-            rows[i].Steps = JSON.parse(rows[i].Steps);
+        if (err) {
+            response.status(500).send(err);
         }
-        response.send(JSON.stringify(rows));
+        else {
+                for (var i = 0 ; i < rows.length ; i++) {
+                rows[i].Ingredients = JSON.parse(rows[i].Ingredients);
+                rows[i].Steps = JSON.parse(rows[i].Steps);
+            }
+            response.send(JSON.stringify(rows));
+        }
     });
 });
 
 // endpoint to get every recipe in the database with Valid flag set to true
 app.get('/v1/getValidRecipes', function(request, response) {
     db.all('SELECT * from Recipes WHERE Valid=1', function(err, rows) {
-        for (var i = 0 ; i < rows.length ; i++) {
-            rows[i].Ingredients = JSON.parse(rows[i].Ingredients);
-            rows[i].Steps = JSON.parse(rows[i].Steps);
+        if (err) {
+            response.status(500).send(err);
         }
-        response.send(JSON.stringify(rows));
+        else {
+            for (var i = 0 ; i < rows.length ; i++) {
+                rows[i].Ingredients = JSON.parse(rows[i].Ingredients);
+                rows[i].Steps = JSON.parse(rows[i].Steps);
+            }
+            response.send(JSON.stringify(rows));
+        }
     });
 });
 
@@ -115,13 +134,18 @@ app.get('/v1/getRecipeByID', function(request, response) {
     var id = request.query.id;
     var stmt = db.prepare('SELECT * FROM Recipes WHERE ID=?');
     stmt.all(id, function(err, rows) {
-        if (rows.length == 0) {
-            response.send(JSON.stringify(null));
+        if (err) {
+            response.status(500).send(err);
         }
         else {
-            rows[0].Ingredients = JSON.parse(rows[0].Ingredients);
-            rows[0].Steps = JSON.parse(rows[0].Steps);
-            response.send(JSON.stringify(rows[0]));
+            if (rows.length == 0) {
+                response.send(JSON.stringify(null));
+            }
+            else {
+                rows[0].Ingredients = JSON.parse(rows[0].Ingredients);
+                rows[0].Steps = JSON.parse(rows[0].Steps);
+                response.send(JSON.stringify(rows[0]));
+            }
         }
     });
     stmt.finalize();
@@ -167,27 +191,32 @@ app.post('/v1/rateRecipeEase', function(request, response) {
     db.serialize(function() {
         var stmt1 = db.prepare('SELECT EaseRating, EaseRatingCount FROM Recipes WHERE ID=?');
         stmt1.all(input.ID, function(err, rows) {
-            if (rows.length == 0) {
-                response.status(500).send('ID not found');
-            }
-            else if (isNaN(input.EaseRating)) {
-                response.status(500).send('Rating was not a number');
+            if (err) {
+                response.status(500).send(err);
             }
             else {
-                var currentRating = rows[0].EaseRating;
-                var currentCount = rows[0].EaseRatingCount;
+                if (rows.length == 0) {
+                    response.status(500).send('ID not found');
+                }
+                else if (isNaN(input.EaseRating)) {
+                    response.status(500).send('Rating was not a number');
+                }
+                else {
+                    var currentRating = rows[0].EaseRating;
+                    var currentCount = rows[0].EaseRatingCount;
 
-                var newRating = (currentRating * currentCount / (currentCount + 1)) + (input.EaseRating / (currentCount + 1));
+                    var newRating = (currentRating * currentCount / (currentCount + 1)) + (input.EaseRating / (currentCount + 1));
 
-                var stmt2 = db.prepare('UPDATE Recipes SET EaseRating=?, EaseRatingCount=? WHERE ID=?');
-                stmt2.run([
-                    newRating,
-                    currentCount + 1,
-                    input.ID
-                ]);
-                stmt2.finalize();
+                    var stmt2 = db.prepare('UPDATE Recipes SET EaseRating=?, EaseRatingCount=? WHERE ID=?');
+                    stmt2.run([
+                        newRating,
+                        currentCount + 1,
+                        input.ID
+                    ]);
+                    stmt2.finalize();
 
-                response.sendStatus(200);
+                    response.sendStatus(200);
+                }
             }
         });
         stmt1.finalize();
@@ -201,27 +230,32 @@ app.post('/v1/rateRecipeTaste', function(request, response) {
     db.serialize(function() {
         var stmt1 = db.prepare('SELECT TasteRating, TasteRatingCount FROM Recipes WHERE ID=?');
         stmt1.all(input.ID, function(err, rows) {
-            if (rows.length == 0) {
-                response.status(500).send('ID not found');
-            }
-            else if (isNaN(input.TasteRating)) {
-                response.status(500).send('Rating was not a number');
+            if (err) {
+                response.status(500).send(err);
             }
             else {
-                var currentRating = rows[0].TasteRating;
-                var currentCount = rows[0].TasteRatingCount;
+                if (rows.length == 0) {
+                    response.status(500).send('ID not found');
+                }
+                else if (isNaN(input.TasteRating)) {
+                    response.status(500).send('Rating was not a number');
+                }
+                else {
+                    var currentRating = rows[0].TasteRating;
+                    var currentCount = rows[0].TasteRatingCount;
 
-                var newRating = (currentRating * currentCount / (currentCount + 1)) + (input.TasteRating / (currentCount + 1));
+                    var newRating = (currentRating * currentCount / (currentCount + 1)) + (input.TasteRating / (currentCount + 1));
 
-                var stmt2 = db.prepare('UPDATE Recipes SET TasteRating=?, TasteRatingCount=? WHERE ID=?');
-                stmt2.run([
-                    newRating,
-                    currentCount + 1,
-                    input.ID
-                ]);
-                stmt2.finalize();
+                    var stmt2 = db.prepare('UPDATE Recipes SET TasteRating=?, TasteRatingCount=? WHERE ID=?');
+                    stmt2.run([
+                        newRating,
+                        currentCount + 1,
+                        input.ID
+                    ]);
+                    stmt2.finalize();
 
-                response.sendStatus(200);
+                    response.sendStatus(200);
+                }
             }
         });
         stmt1.finalize();
