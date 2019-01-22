@@ -129,6 +129,19 @@ app.get('/v1/getValidRecipes', function(request, response) {
     });
 });
 
+// endpoint to get a random index from the database that is guaranteed to correspond to a valid recipe
+app.get('/v1/getRandomValidIndex', function(request, response) {
+    db.all('SELECT ID from Recipes WHERE Valid=1', function(err, rows) {
+        if (err) {
+            response.status(500).send(err);
+        }
+        else {
+            var randomIndex = Math.floor(Math.random() * rows.length);
+            response.send(JSON.stringify(randomIndex));
+        }
+    });
+});
+
 // endpoint to get a recipe by its ID in the database
 app.get('/v1/getRecipeByID', function(request, response) {
     var id = request.query.id;
