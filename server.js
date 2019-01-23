@@ -137,7 +137,7 @@ app.get('/v1/getRandomValidIndex', function(request, response) {
         }
         else {
             var randomIndex = Math.floor(Math.random() * rows.length);
-            response.send(JSON.stringify(randomIndex));
+            response.send(JSON.stringify(rows[randomIndex].ID));
         }
     });
 });
