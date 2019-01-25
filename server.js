@@ -68,9 +68,26 @@ if (!exists) {
             JSON.stringify(['Bread (6 slices)','Eggs (2)','Milk (2/3 cups)','Cinnamon (1 tsp)','Sugar (1 tsp)']),
             JSON.stringify([
                 'Heat a pan or skillet to medium heat on a stove, and coat bottom of pan with a small amount of butter or oil',
-                'Pour the milk and eggs into a bowl; gently mix them together so that the egg yolks are broken and the liquids are relatively mixed.',
+                'Pour the milk and eggs into a bowl; gently mix them together so that the egg yolks are broken and the liquids are relatively mixed',
                 'Dip a bread slice in the egg mixture until all sides and edges are soaked, then fry in pan until golden on each side',
                 'Mix sugar and cinnamon together; sprinkle on each slice after it is done cooking'
+            ]),
+            5,
+            1,
+            5,
+            1,
+            1
+        ]);
+        stmt.run([
+            "Egg in a Basket",
+            JSON.stringify(['Bread (1 slice)','Eggs (1)']),
+            JSON.stringify([
+                'Heat a pan or skillet to medium heat on a stove, and coat bottom of pan with a small amount of butter or oil',
+                'Separate the egg; put the white into a shallow bowl, and set the yolk aside for the time being',
+                'Cut a ~1-inch round hole out of the center of the slice of bread',
+                'Dip the slice of bread into the egg whites until it is soaked on both sides',
+                'Put the bread in the heated pan, and immediately put the egg yolk in the hole of the bread',
+                'Cook for 2-4 minutes per side, until egg yolk is cooked to desired texture'
             ]),
             5,
             1,
@@ -158,6 +175,38 @@ app.get('/v1/getRecipeByID', function(request, response) {
                 rows[0].Ingredients = JSON.parse(rows[0].Ingredients);
                 rows[0].Steps = JSON.parse(rows[0].Steps);
                 response.send(JSON.stringify(rows[0]));
+            }
+        }
+    });
+    stmt.finalize();
+});
+
+// endpoint to get a list of recipes given a list of IDs in the database
+app.get('/v1/getRecipesByIDs', function(request, response) {
+    var ids = request.query.ids;
+    console.log(ids);
+    var idListParams = "";
+    for (var i = 0 ; i < ids.length ; i++) {
+        idListParams += "?";
+        if (i != ids.length - 1) {
+            idListParams += ","
+        }
+    }
+    var stmt = db.prepare('SELECT * FROM Recipes WHERE ID IN (' + idListParams + ')');
+    stmt.all(ids, function(err, rows) {
+        if (err) {
+            response.status(500).send(err);
+        }
+        else {
+            if (rows.length == 0) {
+                response.send(JSON.stringify(null));
+            }
+            else {
+                for (var i = 0 ; i < rows.length ; i++) {
+                    rows[i].Ingredients = JSON.parse(rows[i].Ingredients);
+                    rows[i].Steps = JSON.parse(rows[i].Steps);
+                }
+                response.send(JSON.stringify(rows));
             }
         }
     });
