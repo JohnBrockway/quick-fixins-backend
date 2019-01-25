@@ -184,7 +184,6 @@ app.get('/v1/getRecipeByID', function(request, response) {
 // endpoint to get a list of recipes given a list of IDs in the database
 app.get('/v1/getRecipesByIDs', function(request, response) {
     var ids = request.query.ids;
-    console.log(ids);
     var idListParams = "";
     for (var i = 0 ; i < ids.length ; i++) {
         idListParams += "?";
