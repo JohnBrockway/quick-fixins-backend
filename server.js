@@ -239,7 +239,10 @@ app.post('/v1/addRecipe', function(request, response) {
             1,
             1
         ], function (err) {
-            if (!err) {
+            if (err) {
+                response.sendStatus(500);
+            }
+            else {
                 response.send(this.lastID);
             }
         });
