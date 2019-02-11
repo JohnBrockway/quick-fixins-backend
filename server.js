@@ -190,11 +190,13 @@ app.post('/v1/addRecipe', function(request, response) {
             5,
             1,
             1
-        ]);
+        ], function (err) {
+            if (!err) {
+                response.send(this.lastID);
+            }
+        });
         stmt.finalize();
     });
-
-    response.sendStatus(200);
 });
 
 // endpoint to rate the ease of a recipe
