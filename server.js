@@ -243,7 +243,8 @@ app.post('/v1/addRecipe', function(request, response) {
                 response.sendStatus(500);
             }
             else {
-                response.send(this.lastID);
+                var res = { ID: this.lastID };
+                response.send(JSON.stringify(res));
             }
         });
         stmt.finalize();
