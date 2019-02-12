@@ -147,14 +147,13 @@ app.get('/v1/getValidRecipes', function(request, response) {
 });
 
 // endpoint to get a random ID from the database that is guaranteed to correspond to a valid recipe
-app.get('/v1/getRandomValidID', function(request, response) {
+app.get('/v1/getValidIDs', function(request, response) {
     db.all('SELECT ID from Recipes WHERE Valid=1', function(err, rows) {
         if (err) {
             response.status(500).send(err);
         }
         else {
-            var randomIndex = Math.floor(Math.random() * rows.length);
-            response.send(JSON.stringify(rows[randomIndex].ID));
+            response.send(JSON.stringify(rows));
         }
     });
 });
