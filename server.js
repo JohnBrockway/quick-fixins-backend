@@ -146,7 +146,7 @@ app.get('/v1/getValidRecipes', function(request, response) {
     });
 });
 
-// endpoint to get a random ID from the database that is guaranteed to correspond to a valid recipe
+// endpoint to get a list of valid IDs from the database
 app.get('/v1/getValidIDs', function(request, response) {
     db.all('SELECT ID from Recipes WHERE Valid=1', function(err, rows) {
         if (err) {
