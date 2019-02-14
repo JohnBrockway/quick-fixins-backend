@@ -1,6 +1,8 @@
 // init project
+require('dotenv').config();
 var express = require('express');
 var bodyParser = require('body-parser');
+
 var app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -12,12 +14,17 @@ var exists = fs.existsSync(dbFile);
 var sqlite3 = require('sqlite3').verbose();
 var db = new sqlite3.Database(dbFile);
 
+var imgur = require('imgur');
+imgur.setClientId(process.env.IMGUR_CLIENT_ID);
+imgur.setAPIUrl(process.env.IMGUR_API_URL);
+
 var tableColumns = [
     "ID",
+    "ImageUrl",
     "Name",
     "Ingredients",
     "Steps",
-    "EaseRating", 
+    "EaseRating",
     "EaseRatingCount",
     "TasteRating",
     "TasteRatingCount",
@@ -29,16 +36,17 @@ var tableColumnsTypes = [
     "TEXT",
     "TEXT",
     "TEXT",
-    "REAL", 
+    "TEXT",
+    "REAL",
     "INTEGER",
     "REAL",
-    "INTEGER", 
+    "INTEGER",
     "INTEGER"
 ];
 
 // if the .db file does not exist, create it
 if (!exists) {
-    
+
     var tableColumnsWithTypes = "";
     for (var i = 0 ; i < tableColumns.length ; i++) {
         tableColumnsWithTypes += tableColumns[i] + " " + tableColumnsTypes[i];
@@ -46,7 +54,7 @@ if (!exists) {
             tableColumnsWithTypes += ",";
         }
     }
-    
+
     var tableColumnsString = "";
     var paramsString = "";
     for (var i = 1 ; i < tableColumns.length ; i++) {
@@ -60,10 +68,11 @@ if (!exists) {
 
     db.serialize(function() {
         db.run('CREATE TABLE Recipes (' + tableColumnsWithTypes + ')');
-        
+
         // seed default recipes
         var stmt = db.prepare('INSERT INTO Recipes (' + tableColumnsString + ') VALUES (' + paramsString + ')');
         stmt.run([
+            "https://i.imgur.com/WGrtNJZ.jpg",
             "French Toast",
             JSON.stringify(['Bread (6 slices)','Eggs (2)','Milk (2/3 cups)','Cinnamon (1 tsp)','Sugar (1 tsp)']),
             JSON.stringify([
@@ -79,6 +88,7 @@ if (!exists) {
             1
         ]);
         stmt.run([
+            "https://i.imgur.com/42lpV52.jpg",
             "Egg in a Basket",
             JSON.stringify(['Bread (1 slice)','Eggs (1)']),
             JSON.stringify([
@@ -121,7 +131,7 @@ app.get('/v1/getRecipes', function(request, response) {
             response.status(500).send(err);
         }
         else {
-                for (var i = 0 ; i < rows.length ; i++) {
+            for (var i = 0 ; i < rows.length ; i++) {
                 rows[i].Ingredients = JSON.parse(rows[i].Ingredients);
                 rows[i].Steps = JSON.parse(rows[i].Steps);
             }
@@ -215,39 +225,51 @@ app.get('/v1/getRecipesByIDs', function(request, response) {
 app.post('/v1/addRecipe', function(request, response) {
     var recipe = request.body;
 
-    var tableColumnsString = "";
-    var paramsString = "";
-    for (var i = 1 ; i < tableColumns.length ; i++) {
-        tableColumnsString += tableColumns[i];
-        paramsString += "?"
-        if (i != tableColumns.length - 1) {
-            tableColumnsString += ",";
-            paramsString += ","
-        }
-    }
+    var imageUrl = null;
 
-    db.serialize(function() {
-        var stmt = db.prepare('INSERT INTO Recipes (' + tableColumnsString + ') VALUES (' + paramsString + ')');
-        stmt.run([
-            recipe.Name,
-            JSON.stringify(recipe.Ingredients),
-            JSON.stringify(recipe.Steps),
-            5,
-            1,
-            5,
-            1,
-            1
-        ], function (err) {
-            if (err) {
-                response.sendStatus(500);
+    imgur.uploadBase64(recipe.ImageData)
+        .then(function(json) {
+            imageUrl = json.data.link;
+        })
+        .catch(function(err) {
+            console.error(err.message);
+        })
+        .finally(function() {
+            var tableColumnsString = "";
+            var paramsString = "";
+            for (var i = 1 ; i < tableColumns.length ; i++) {
+                tableColumnsString += tableColumns[i];
+                paramsString += "?"
+                if (i != tableColumns.length - 1) {
+                    tableColumnsString += ",";
+                    paramsString += ","
+                }
             }
-            else {
-                var res = { ID: this.lastID };
-                response.send(JSON.stringify(res));
-            }
+
+            db.serialize(function() {
+                var stmt = db.prepare('INSERT INTO Recipes (' + tableColumnsString + ') VALUES (' + paramsString + ')');
+                stmt.run([
+                    imageUrl,
+                    recipe.Name,
+                    JSON.stringify(recipe.Ingredients),
+                    JSON.stringify(recipe.Steps),
+                    5,
+                    1,
+                    5,
+                    1,
+                    1
+                ], function(err) {
+                    if (err) {
+                        response.sendStatus(500);
+                    }
+                    else {
+                        var res = { ID: this.lastID };
+                        response.send(JSON.stringify(res));
+                    }
+                });
+                stmt.finalize();
+            });
         });
-        stmt.finalize();
-    });
 });
 
 // endpoint to rate the ease of a recipe
@@ -353,6 +375,6 @@ app.post('/v1/validateRecipe', function(request, response) {
 });
 
 // listen for requests
-var listener = app.listen(process.env.PORT, function () {
+var listener = app.listen(process.env.PORT, function() {
     console.log('Listening on port ' + listener.address().port);
 });
