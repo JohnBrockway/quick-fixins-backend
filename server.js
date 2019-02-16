@@ -25,9 +25,8 @@ var tableColumns = [
     "Ingredients",
     "Steps",
     "EaseRating",
-    "EaseRatingCount",
     "TasteRating",
-    "TasteRatingCount",
+    "RatingCount",
     "Valid"
 ];
 
@@ -38,7 +37,6 @@ var tableColumnsTypes = [
     "TEXT",
     "TEXT",
     "REAL",
-    "INTEGER",
     "REAL",
     "INTEGER",
     "INTEGER"
@@ -82,7 +80,6 @@ if (!exists) {
                 'Mix sugar and cinnamon together; sprinkle on each slice after it is done cooking'
             ]),
             5,
-            1,
             5,
             1,
             1
@@ -100,7 +97,6 @@ if (!exists) {
                 'Cook for 2-4 minutes per side, until egg yolk is cooked to desired texture'
             ]),
             5,
-            1,
             5,
             1,
             1
@@ -254,7 +250,6 @@ app.post('/v1/addRecipe', function(request, response) {
                     JSON.stringify(recipe.Ingredients),
                     JSON.stringify(recipe.Steps),
                     5,
-                    1,
                     5,
                     1,
                     1
@@ -272,12 +267,12 @@ app.post('/v1/addRecipe', function(request, response) {
         });
 });
 
-// endpoint to rate the ease of a recipe
-app.post('/v1/rateRecipeEase', function(request, response) {
+// endpoint to rate the ease and taste of a recipe
+app.post('/v1/rateRecipe', function(request, response) {
     var input = request.body;
 
     db.serialize(function() {
-        var stmt1 = db.prepare('SELECT EaseRating, EaseRatingCount FROM Recipes WHERE ID=?');
+        var stmt1 = db.prepare('SELECT EaseRating, TasteRating, RatingCount FROM Recipes WHERE ID=?');
         stmt1.all(input.ID, function(err, rows) {
             if (err) {
                 response.status(500).send(err);
@@ -286,63 +281,30 @@ app.post('/v1/rateRecipeEase', function(request, response) {
                 if (rows.length == 0) {
                     response.status(500).send('ID not found');
                 }
-                else if (isNaN(input.EaseRating)) {
+                else if (isNaN(input.EaseRating) || isNaN(input.TasteRating)) {
                     response.status(500).send('Rating was not a number');
                 }
                 else {
-                    var currentRating = rows[0].EaseRating;
-                    var currentCount = rows[0].EaseRatingCount;
+                    var currentEaseRating = rows[0].EaseRating;
+                    var currentTasteRating = rows[0].TasteRating;
+                    var currentCount = rows[0].RatingCount;
 
-                    var newRating = (currentRating * currentCount / (currentCount + 1)) + (input.EaseRating / (currentCount + 1));
+                    var newEaseRating = (currentEaseRating * currentCount / (currentCount + 1)) + (input.EaseRating / (currentCount + 1));
+                    var newTasteRating = (currentTasteRating * currentCount / (currentCount + 1)) + (input.TasteRating / (currentCount + 1));
 
-                    var stmt2 = db.prepare('UPDATE Recipes SET EaseRating=?, EaseRatingCount=? WHERE ID=?');
+                    var stmt2 = db.prepare('UPDATE Recipes SET EaseRating=?, TasteRating=?, RatingCount=? WHERE ID=?');
                     stmt2.run([
-                        newRating,
+                        newEaseRating,
+                        newTasteRating,
                         currentCount + 1,
                         input.ID
                     ]);
                     stmt2.finalize();
 
-                    response.sendStatus(200);
-                }
-            }
-        });
-        stmt1.finalize();
-    });
-});
-
-// endpoint to rate the taste of a recipe
-app.post('/v1/rateRecipeTaste', function(request, response) {
-    var input = request.body;
-
-    db.serialize(function() {
-        var stmt1 = db.prepare('SELECT TasteRating, TasteRatingCount FROM Recipes WHERE ID=?');
-        stmt1.all(input.ID, function(err, rows) {
-            if (err) {
-                response.status(500).send(err);
-            }
-            else {
-                if (rows.length == 0) {
-                    response.status(500).send('ID not found');
-                }
-                else if (isNaN(input.TasteRating)) {
-                    response.status(500).send('Rating was not a number');
-                }
-                else {
-                    var currentRating = rows[0].TasteRating;
-                    var currentCount = rows[0].TasteRatingCount;
-
-                    var newRating = (currentRating * currentCount / (currentCount + 1)) + (input.TasteRating / (currentCount + 1));
-
-                    var stmt2 = db.prepare('UPDATE Recipes SET TasteRating=?, TasteRatingCount=? WHERE ID=?');
-                    stmt2.run([
-                        newRating,
-                        currentCount + 1,
-                        input.ID
-                    ]);
-                    stmt2.finalize();
-
-                    response.sendStatus(200);
+                    response.send(JSON.stringify({
+                        EaseRating: newEaseRating,
+                        TasteRating: newTasteRating
+                    }));
                 }
             }
         });
