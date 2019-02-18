@@ -122,23 +122,28 @@ app.get('/v1/up', function(request, response) {
 
 // endpoint to get every recipe in the database
 app.get('/v1/getRecipes', function(request, response) {
-    db.all('SELECT * from Recipes', function(err, rows) {
-        if (err) {
-            response.status(500).send(err);
-        }
-        else {
-            for (var i = 0 ; i < rows.length ; i++) {
-                rows[i].Ingredients = JSON.parse(rows[i].Ingredients);
-                rows[i].Steps = JSON.parse(rows[i].Steps);
+    if (isValidAuthCode(request.query.auth_code)) {
+        db.all('SELECT * FROM Recipes', function(err, rows) {
+            if (err) {
+                response.status(500).send(err);
             }
-            response.send(JSON.stringify(rows));
-        }
-    });
+            else {
+                for (var i = 0 ; i < rows.length ; i++) {
+                    rows[i].Ingredients = JSON.parse(rows[i].Ingredients);
+                    rows[i].Steps = JSON.parse(rows[i].Steps);
+                }
+                response.send(JSON.stringify(rows));
+            }
+        });
+    }
+    else {
+        response.status(500).send("You are not authorized for this access");
+    }
 });
 
 // endpoint to get every recipe in the database with Valid flag set to true
 app.get('/v1/getValidRecipes', function(request, response) {
-    db.all('SELECT * from Recipes WHERE Valid=1', function(err, rows) {
+    db.all('SELECT * FROM Recipes WHERE Valid=1', function(err, rows) {
         if (err) {
             response.status(500).send(err);
         }
@@ -154,7 +159,7 @@ app.get('/v1/getValidRecipes', function(request, response) {
 
 // endpoint to get a list of valid IDs from the database
 app.get('/v1/getValidIDs', function(request, response) {
-    db.all('SELECT ID from Recipes WHERE Valid=1', function(err, rows) {
+    db.all('SELECT ID FROM Recipes WHERE Valid=1', function(err, rows) {
         if (err) {
             response.status(500).send(err);
         }
@@ -167,7 +172,13 @@ app.get('/v1/getValidIDs', function(request, response) {
 // endpoint to get a recipe by its ID in the database
 app.get('/v1/getRecipeByID', function(request, response) {
     var id = request.query.id;
-    var stmt = db.prepare('SELECT * FROM Recipes WHERE ID=?');
+    var stmt;
+    if (isValidAuthCode(request.query.auth_code)) {
+        stmt = db.prepare('SELECT * FROM Recipes WHERE ID=?');
+    }
+    else {
+        stmt = db.prepare('SELECT * FROM Recipes WHERE ID=? AND Valid=1');
+    }
     stmt.all(id, function(err, rows) {
         if (err) {
             response.status(500).send(err);
@@ -196,7 +207,14 @@ app.get('/v1/getRecipesByIDs', function(request, response) {
             idListParams += ","
         }
     }
-    var stmt = db.prepare('SELECT * FROM Recipes WHERE ID IN (' + idListParams + ')');
+
+    var stmt;
+    if (isValidAuthCode(request.query.auth_code)) {
+        stmt = db.prepare('SELECT * FROM Recipes WHERE ID IN (' + idListParams + ')');
+    }
+    else {
+        stmt = db.prepare('SELECT * FROM Recipes WHERE ID IN (' + idListParams + ') AND Valid=1');
+    }
     stmt.all(ids, function(err, rows) {
         if (err) {
             response.status(500).send(err);
@@ -314,29 +332,43 @@ app.post('/v1/rateRecipe', function(request, response) {
 
 // endpoint to set the Valid flag of an entry to false
 app.post('/v1/invalidateRecipe', function(request, response) {
-    var input = request.body;
+    if (isValidAuthCode(request.body.auth_code)) {
+        var input = request.body;
 
-    db.serialize(function() {
-        var stmt = db.prepare('UPDATE Recipes SET Valid=0 WHERE ID=?');
-        stmt.run(input.ID);
-        stmt.finalize();
-        response.sendStatus(200);
-    });
+        db.serialize(function() {
+            var stmt = db.prepare('UPDATE Recipes SET Valid=0 WHERE ID=?');
+            stmt.run(input.ID);
+            stmt.finalize();
+            response.sendStatus(200);
+        });
+    }
+    else {
+        response.status(500).send("You are not authorized for this access");
+    }
 });
 
 // endpoint to set the Valid flag of an entry to true
 app.post('/v1/validateRecipe', function(request, response) {
-    var input = request.body;
+    if (isValidAuthCode(request.body.auth_code)) {
+        var input = request.body;
 
-    db.serialize(function() {
-        var stmt = db.prepare('UPDATE Recipes SET Valid=1 WHERE ID=?');
-        stmt.run(input.ID);
-        stmt.finalize();
-        response.sendStatus(200);
-    });
+        db.serialize(function() {
+            var stmt = db.prepare('UPDATE Recipes SET Valid=1 WHERE ID=?');
+            stmt.run(input.ID);
+            stmt.finalize();
+            response.sendStatus(200);
+        });
+    }
+    else {
+        response.status(500).send("You are not authorized for this access");
+    }
 });
 
 // listen for requests
 var listener = app.listen(process.env.PORT, function() {
     console.log('Listening on port ' + listener.address().port);
 });
+
+function isValidAuthCode(authCode) {
+    return authCode == process.env.AUTH_CODE;
+}
